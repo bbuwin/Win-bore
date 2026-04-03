@@ -1,0 +1,50 @@
+name: Bore RDP - Public Repo Secure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    
+    steps:
+    - name: Download Bore
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-pc-windows-msvc.zip" -OutFile "bore.zip"
+        Expand-Archive -Path "bore.zip" -DestinationPath "."
+        
+    - name: Enable RDP
+      run: |
+        # Enable RDP
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        netsh advfirewall firewall add rule name="RDP" dir=in protocol=tcp localport=3389 action=allow
+        
+        # Create user from Secrets (hidden in logs)
+        net user ${{ secrets.RDP_USERNAME }} ${{ secrets.RDP_PASSWORD }} /add
+        net localgroup administrators ${{ secrets.RDP_USERNAME }} /add
+        
+        Start-Service TermService -ErrorAction SilentlyContinue
+        
+    - name: Start Bore Tunnel
+      run: |
+        Start-Process -NoNewWindow -FilePath ".\bore.exe" -ArgumentList "local 3389 --to bore.pub"
+        Start-Sleep -Seconds 10
+        
+        Write-Host ""
+        Write-Host "========================================="
+        Write-Host "✅ BORE RDP READY"
+        Write-Host "========================================="
+        Write-Host ""
+        Write-Host "📡 Bore address (check logs above):"
+        Write-Host "   listening at bore.pub:XXXXX"
+        Write-Host ""
+        Write-Host "🔑 Username and password are stored in"
+        Write-Host "   GitHub Secrets (not visible to anyone)"
+        Write-Host ""
+        Write-Host "========================================="
+        
+        while ($true) { 
+            Start-Sleep -Seconds 300 
+        }
