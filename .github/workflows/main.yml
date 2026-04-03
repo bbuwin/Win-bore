@@ -21,30 +21,34 @@ jobs:
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         netsh advfirewall firewall add rule name="RDP" dir=in protocol=tcp localport=3389 action=allow
         
-        # Create user from Secrets (hidden in logs)
+        # Create user from Secrets
         net user ${{ secrets.RDP_USERNAME }} ${{ secrets.RDP_PASSWORD }} /add
         net localgroup administrators ${{ secrets.RDP_USERNAME }} /add
         
         Start-Service TermService -ErrorAction SilentlyContinue
         
+        # Verify RDP is actually listening
+        Write-Host "Verifying RDP is listening..."
+        netstat -an | findstr ":3389"
+        
     - name: Start Bore Tunnel
       run: |
-        Start-Process -NoNewWindow -FilePath ".\bore.exe" -ArgumentList "local 3389 --to bore.pub"
-        Start-Sleep -Seconds 10
-        
         Write-Host ""
         Write-Host "========================================="
         Write-Host "✅ BORE RDP READY"
         Write-Host "========================================="
+        Write-Host "Username: ${{ secrets.RDP_USERNAME }}"
+        Write-Host "Password: [HIDDEN IN SECRETS]"
         Write-Host ""
-        Write-Host "📡 Bore address (check logs above):"
-        Write-Host "   listening at bore.pub:XXXXX"
-        Write-Host ""
-        Write-Host "🔑 Username and password are stored in"
-        Write-Host "   GitHub Secrets (not visible to anyone)"
-        Write-Host ""
+        Write-Host "Looking for Bore address..."
         Write-Host "========================================="
+        Write-Host ""
         
+        # Run Bore in foreground (this keeps it alive)
+        .\bore.exe local 3389 --to bore.pub
+        
+        # Keep alive (this line only runs if Bore exits)
         while ($true) { 
+            Write-Host "RDP session active..."
             Start-Sleep -Seconds 300 
         }
